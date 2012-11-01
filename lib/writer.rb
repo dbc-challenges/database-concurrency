@@ -36,14 +36,14 @@ module Writer
 end
 
 
-DB_CLASSES = { "sqlite3" => SQLite3DB, "postgresql" => PostgresqlDB, "mysql" => MysqlDB }
+DB_CLASSES = { "sqlite3" => :SQLite3DB, "postgresql" => :PostgresqlDB, "mysql" => :MysqlDB }
 
 howmany = 0
 begin
   raise ArgumentError, "Usage: #{File.basename($0)} <sqlite3 | postgresql | mysql>" unless ARGV.length == 1 && DB_CLASSES.keys.include?(ARGV[0])
 
   # Instantiate a DB class based on the argument passed-in.
-  db = DB_CLASSES[ARGV[0]].new
+  db = Object.const_get(DB_CLASSES[ARGV[0]]).new
 
   print "Started ... "
   $stdout.flush

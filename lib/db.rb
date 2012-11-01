@@ -1,7 +1,3 @@
-require 'sqlite3'
-require 'pg'
-require 'mysql'
-
 
 class DB
 
@@ -28,7 +24,7 @@ class DB
 
 end
 
-
+require 'sqlite3'
 class SQLite3DB < DB
 
   def initialize(db_filename=File.join(File.dirname(__FILE__), '../db/database_concurrency.sqlite3'))
@@ -46,51 +42,63 @@ class SQLite3DB < DB
 
 end
 
+begin
+  require 'pg2'
 
-class PostgresqlDB < DB
-  def initialize(host="localhost", port=5432, dbname="database_concurrency", login=ENV["LOGNAME"], password="")
-    # host, port, options, tty, dbname, login, password
-    @db = PGconn.connect host, port, "", "", dbname, login, password
-    super()
-  end
-
-  def autoincrement
-    "SERIAL"
-  end
-
-  def execute(sql, *args)
-    n = 0
-    while sql =~ /\?/
-      sql = sql.sub(/\?/, "$#{n+=1}") 
+  class PostgresqlDB < DB
+    def initialize(host="localhost", port=5432, dbname="database_concurrency", login=ENV["LOGNAME"], password="")
+      # host, port, options, tty, dbname, login, password
+      @db = PGconn.connect host, port, "", "", dbname, login, password
+      super()
     end
 
-    @db.exec(sql, *args).values
+    def autoincrement
+      "SERIAL"
+    end
+
+    def execute(sql, *args)
+      n = 0
+      while sql =~ /\?/
+        sql = sql.sub(/\?/, "$#{n+=1}") 
+      end
+
+      @db.exec(sql, *args).values
+    end
   end
+  
+rescue LoadError => e
+  $stderr.puts "WARNING: Could't require 'pg' -- PostgreSQL server and gem need to be installed before running on PostgreSQL."
 end
 
+begin
+  require 'mysqlx'
 
-class MysqlDB < DB
-  def initialize(host="localhost", user="root", password="", database="database_concurrency")
-    @db = Mysql.new host, user, password, database
-    super()
-  end
-
-  def autoincrement
-    "INT PRIMARY KEY AUTO_INCREMENT"
-  end
-
-  def execute(sql, *args)
-    array = []
-    rs = nil
-    if sql.include? '?'
-      pst = @db.prepare sql
-      rs = pst.execute *args
-    else
-      rs = @db.query sql
+  class MysqlDB < DB
+    def initialize(host="localhost", user="root", password="", database="database_concurrency")
+      @db = Mysql.new host, user, password, database
+      super()
     end
-    unless rs.nil?
-      rs.each { |row| array << row } if rs.num_rows > 0
+
+    def autoincrement
+      "INT PRIMARY KEY AUTO_INCREMENT"
     end
-    array
+
+    def execute(sql, *args)
+      array = []
+      rs = nil
+      if sql.include? '?'
+        pst = @db.prepare sql
+        rs = pst.execute *args
+      else
+        rs = @db.query sql
+      end
+      unless rs.nil?
+        rs.each { |row| array << row } if rs.num_rows > 0
+      end
+      array
+    end
   end
+
+rescue LoadError => e
+  $stderr.puts "WARNING: Could't require 'mysql' -- MySQL server and gem need to be installed before running on MySQL."
 end
